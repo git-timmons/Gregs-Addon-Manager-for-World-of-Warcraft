@@ -8,7 +8,8 @@ uses
   AddonManager in 'Units\AddonManager.pas',
   BackupEngine in 'Units\BackupEngine.pas',
   BackupEngineThreaded in 'Units\BackupEngineThreaded.pas',
-  FileWatcher in 'Units\FileWatcher.pas';
+  FileWatcher in 'Units\FileWatcher.pas',
+  TOCParser in 'Units\TOCParser.pas';
 
 {$R *.res}
 

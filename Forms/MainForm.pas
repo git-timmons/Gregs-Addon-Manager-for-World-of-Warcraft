@@ -1,4 +1,4 @@
-﻿unit MainForm;
+unit MainForm;
 
 interface
 
@@ -32,6 +32,8 @@ type
     mnuRemove: TMenuItem;
     N1: TMenuItem;
     mnuViewBackups: TMenuItem;
+    // NEW BUTTON - we'll add this to the .dfm manually or comment it out
+    // btnScanAddons: TButton;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure btnAddAddonClick(Sender: TObject);
@@ -49,6 +51,9 @@ type
     procedure mnuRemoveClick(Sender: TObject);
     procedure mnuViewBackupsClick(Sender: TObject);
     procedure lblWatcherStatusClick(Sender: TObject);
+    // NEW: Scan addons
+    procedure btnScanAddonsClick(Sender: TObject);
+    procedure mnuSetURLClick(Sender: TObject);
   private
     FAddonManager: TAddonManager;
     FBackupEngine: TBackupEngine;
@@ -74,6 +79,9 @@ type
     
     procedure OnAddonDetected(Sender: TObject; const ZipInfo: TAddonZipInfo);
     procedure UpdateWatcherStatus;
+    
+    // NEW: Scan-related
+    procedure ScanAndImportAddons;
   public
     { Public declarations }
   end;
@@ -113,10 +121,12 @@ begin
   ListView1.Columns.Add.Caption := 'Folder';
   ListView1.Columns.Add.Caption := 'Last Updated';
   ListView1.Columns.Add.Caption := 'Version';
+  ListView1.Columns.Add.Caption := 'URL Status';  // NEW COLUMN
   ListView1.Columns[0].Width := 200;
   ListView1.Columns[1].Width := 150;
   ListView1.Columns[2].Width := 120;
   ListView1.Columns[3].Width := 100;
+  ListView1.Columns[4].Width := 100;  // URL Status column
   
   // Check if WoW path is set
   if FAddonManager.WoWAddonPath = '' then
@@ -128,6 +138,18 @@ begin
   
   // Load addon list
   LoadAddonList;
+  
+  // Auto-scan on first run if list is empty
+  if (FAddonManager.AddonCount = 0) and (FAddonManager.WoWAddonPath <> '') then
+  begin
+    if MessageDlg(
+      'No addons configured yet.' + sLineBreak + sLineBreak +
+      'Would you like to scan your AddOns folder and import everything?',
+      mtConfirmation, [mbYes, mbNo], 0) = mrYes then
+    begin
+      ScanAndImportAddons;
+    end;
+  end;
   
   // Check for first run / periodic backup
   CheckFirstRun;
@@ -156,6 +178,91 @@ begin
     
   FBackupEngine.Free;
   FAddonManager.Free;
+end;
+
+procedure TForm1.ScanAndImportAddons;
+var
+  ScanResult: TScanResult;
+  Msg: string;
+begin
+  if FAddonManager.WoWAddonPath = '' then
+  begin
+    ShowMessage('Please configure your WoW AddOns path in Settings first.');
+    btnSettingsClick(nil);
+    Exit;
+  end;
+  
+  UpdateStatusBar('Scanning AddOns folder...');
+  Application.ProcessMessages;
+  
+  try
+    ScanResult := FAddonManager.ScanAndImportAddons(True);
+    
+    // Build result message
+    Msg := Format(
+      'Scan Complete!' + sLineBreak + sLineBreak +
+      'Total addons found: %d' + sLineBreak +
+      'New addons imported: %d' + sLineBreak +
+      'Already tracked (skipped): %d',
+      [ScanResult.TotalFound, ScanResult.NewImported, ScanResult.Skipped]
+    );
+    
+    if ScanResult.NoURLCount > 0 then
+    begin
+      Msg := Msg + sLineBreak + sLineBreak +
+             Format('⚠ %d addons have no download URL.' + sLineBreak +
+                    'You can add URLs manually by right-clicking them.',
+                    [ScanResult.NoURLCount]);
+    end;
+    
+    ShowMessage(Msg);
+    
+    // Reload the list
+    LoadAddonList;
+    UpdateStatusBar(Format('Imported %d addons', [ScanResult.NewImported]));
+    
+  except
+    on E: Exception do
+    begin
+      ShowMessage('Error scanning addons: ' + E.Message);
+      UpdateStatusBar('Scan failed');
+    end;
+  end;
+end;
+
+procedure TForm1.btnScanAddonsClick(Sender: TObject);
+begin
+  ScanAndImportAddons;
+end;
+
+procedure TForm1.mnuSetURLClick(Sender: TObject);
+var
+  Index: Integer;
+  Addon: TAddonInfo;
+  NewURL: string;
+begin
+  if ListView1.Selected = nil then
+  begin
+    ShowMessage('Please select an addon first.');
+    Exit;
+  end;
+  
+  Index := Integer(ListView1.Selected.Data);
+  Addon := FAddonManager.GetAddon(Index);
+  
+  NewURL := InputBox(
+    'Set Download URL',
+    Format('Enter download URL for %s:', [Addon.Name]),
+    Addon.URL
+  );
+  
+  if NewURL <> '' then
+  begin
+    Addon.URL := NewURL;
+    FAddonManager.UpdateAddon(Index, Addon);
+    LoadAddonList;
+    UpdateStatusBar('URL updated for ' + Addon.Name);
+  end;
 end;
 
 procedure TForm1.UpdateWatcherStatus;
@@ -218,7 +325,6 @@ begin
 end;
 
 // ... rest of existing MainForm procedures remain the same ...
-// (All the backup, restore, settings code stays unchanged)
 
 procedure TForm1.CheckFirstRun;
 begin
@@ -424,6 +530,7 @@ end;
 procedure TForm1.AddAddonToList(const AddonInfo: TAddonInfo; Index: Integer);
 var
   Item: TListItem;
+  URLStatus: string;
 begin
   Item := ListView1.Items.Add;
   Item.Caption := AddonInfo.Name;
@@ -435,6 +542,20 @@ begin
     Item.SubItems.Add('Never');
     
   Item.SubItems.Add(AddonInfo.CurrentVersion);
+  
+  // URL Status column
+  if AddonInfo.URL <> '' then
+  begin
+    URLStatus := '✓ Has URL';
+    Item.SubItemImages[3] := 0;  // Could use an image index if we had icons
+  end
+  else
+  begin
+    URLStatus := '⚠ No URL';
+    // Could color this red if desired
+  end;
+  Item.SubItems.Add(URLStatus);
+  
   Item.Data := Pointer(Index);
 end;
 

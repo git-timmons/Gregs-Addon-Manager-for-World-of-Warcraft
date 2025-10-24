@@ -3,7 +3,8 @@ unit AddonManager;
 interface
 
 uses
-  System.SysUtils, System.Classes, System.IniFiles, System.IOUtils;
+  System.SysUtils, System.Classes, System.IniFiles, System.IOUtils,
+  TOCParser;  // For addon scanning
 
 type
   TAddonInfo = record
@@ -13,6 +14,13 @@ type
     CurrentVersion: string;
     LastUpdated: TDateTime;
     Notes: string;
+  end;
+  
+  TScanResult = record
+    TotalFound: Integer;
+    NewImported: Integer;
+    Skipped: Integer;
+    NoURLCount: Integer;
   end;
 
   TAddonManager = class
@@ -24,6 +32,7 @@ type
     function GetDataFolder: string;
     procedure LoadSettings;
     procedure LoadAddons;
+    function AddonExists(const FolderName: string): Boolean;
   public
     WoWAddonPath: string;
     DownloadFolder: string;
@@ -41,6 +50,9 @@ type
     procedure RemoveAddon(Index: Integer);
     function GetAddon(Index: Integer): TAddonInfo;
     function AddonCount: Integer;
+    
+    // NEW: Addon scanning and import
+    function ScanAndImportAddons(SkipExisting: Boolean = True): TScanResult;
 
     property DataFolder: string read FDataFolder;
     property IniFile: TIniFile read FIniFile; // Expose for settings access
@@ -139,6 +151,74 @@ begin
     end;
   finally
     Sections.Free;
+  end;
+end;
+
+function TAddonManager.AddonExists(const FolderName: string): Boolean;
+var
+  i: Integer;
+begin
+  Result := False;
+  for i := 0 to High(FAddons) do
+  begin
+    if SameText(FAddons[i].FolderName, FolderName) then
+    begin
+      Result := True;
+      Break;
+    end;
+  end;
+end;
+
+function TAddonManager.ScanAndImportAddons(SkipExisting: Boolean): TScanResult;
+var
+  TOCInfos: TArray<TTOCInfo>;
+  TOCInfo: TTOCInfo;
+  Addon: TAddonInfo;
+begin
+  // Initialize result
+  Result.TotalFound := 0;
+  Result.NewImported := 0;
+  Result.Skipped := 0;
+  Result.NoURLCount := 0;
+  
+  if WoWAddonPath = '' then
+    raise Exception.Create('WoW AddOns path not configured');
+    
+  if not TDirectory.Exists(WoWAddonPath) then
+    raise Exception.Create('WoW AddOns path does not exist: ' + WoWAddonPath);
+  
+  // Scan the AddOns folder
+  TOCInfos := TTOCParser.ScanAddOnsFolder(WoWAddonPath);
+  Result.TotalFound := Length(TOCInfos);
+  
+  // Import each discovered addon
+  for TOCInfo in TOCInfos do
+  begin
+    // Skip if already exists
+    if SkipExisting and AddonExists(TOCInfo.FolderName) then
+    begin
+      Inc(Result.Skipped);
+      Continue;
+    end;
+    
+    // Count addons without URLs
+    if TOCInfo.DiscoveredURL = '' then
+      Inc(Result.NoURLCount);
+    
+    // Convert TOCInfo to TAddonInfo
+    Addon.Name := TOCInfo.Title;
+    if Addon.Name = '' then
+      Addon.Name := TOCInfo.FolderName;  // Fallback to folder name
+      
+    Addon.FolderName := TOCInfo.FolderName;
+    Addon.URL := TOCInfo.DiscoveredURL;
+    Addon.CurrentVersion := TOCInfo.Version;
+    Addon.LastUpdated := Now;  // Mark as "just imported"
+    Addon.Notes := TOCInfo.Notes;
+    
+    // Add to manager
+    AddAddon(Addon);
+    Inc(Result.NewImported);
   end;
 end;
 
