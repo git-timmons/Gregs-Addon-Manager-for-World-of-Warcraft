@@ -1,0 +1,114 @@
+TITLE: Greg’s Law - AI Interpretive Naming Standard
+AUTHOR: Gregory Allen Timmons
+VERSION: 1.0
+
+RULESET:
+
+SCOPE: VARIABLE
+TYPE string → prefix s
+TYPE integer → prefix i
+TYPE boolean → prefix b
+TYPE datetime → prefix dt
+TYPE float → prefix flt
+TYPE currency → prefix c
+TYPE fileobject → prefix fil
+TYPE pointer → prefix p
+TYPE object → prefix o
+TYPE interface → prefix intf
+TYPE variant → prefix v
+TYPE record → prefix rec
+TYPE guid → prefix guid
+TYPE char → prefix ch
+TYPE byte → prefix by
+TYPE word → prefix w
+TYPE cardinal → prefix dw
+TYPE enum → prefix e
+TYPE set → prefix set
+
+SCOPE: COLLECTION
+TYPE TArray → prefix arr
+TYPE TList → prefix lst
+TYPE TObjectList → prefix objlst
+TYPE TStringList → prefix sl
+TYPE TDictionary → prefix dict
+TYPE TQueue → prefix que
+TYPE TStack → prefix stk
+TYPE TCollection → prefix col
+TYPE TDataSet → prefix ds
+TYPE TDataSource → prefix src
+
+SCOPE: FIELD
+FORMAT: F + typeprefix + PascalName
+EXAMPLE: FsFileName, FiCount
+
+SCOPE: PARAMETER
+FORMAT: typeprefix + "_" + PascalName
+EXAMPLE: s_FileName, i_Index
+
+SCOPE: CONSTANT
+FORMAT: ALL_UPPER_CASE_WITH_UNDERSCORES
+EXAMPLE: MAX_RETRIES, DEFAULT_PATH
+
+SCOPE: ENUM
+FORMAT: typeabbrev + PascalName
+EXAMPLE: asLoaded, urAdmin
+
+SCOPE: EVENT
+PROPERTY_PREFIX: On
+FIELD_PREFIX: FOn
+METHOD_PREFIX: Do
+ASYNC_PREFIXES: QueueDo / SyncDo
+CALLBACK_PREFIX: Proc / Evt
+EXAMPLE: OnProgress, DoProgress, ProcFinish, EvtError
+
+SCOPE: STREAM
+BASE_PREFIX: stm
+SUBTYPES:
+  TFileStream → stmFile
+  TMemoryStream → stmMem
+  TStringStream → stmStr
+  TResourceStream → stmRes
+
+SCOPE: THREADING
+TThread → thr
+TTask → tsk
+TCriticalSection → cs
+TEvent → evt
+
+SCOPE: SPECIALIZED
+Engine → eng
+Manager → mgr
+Service → svc
+Utility → utl
+Form → frm
+Frame → frmFrame
+Dialog → dlg
+Timer → tim
+
+SCOPE: VISUAL
+TButton → btn
+TLabel → lbl
+TEdit → edt
+TMemo → mem
+TComboBox → cmb
+TCheckBox → chk
+TPanel → pnl
+TGroupBox → grp
+TImage → img
+TProgressBar → prg
+TListView → lvw
+TGrid → grd
+TForm → frm
+
+SCOPE: NAMING_RULES
+- No single-letter variables
+- Always use Self. when assigning field from parameter
+- Always pluralize collections
+- Interfaces never use capital “I”; must use “intf”
+- Parameters always include underscore after type prefix
+- Constants always uppercase
+- Event handlers always begin with “Do”
+- Private fields always begin with “F”
+- Each name must declare scope, type, and intent
+
+END OF FILE
